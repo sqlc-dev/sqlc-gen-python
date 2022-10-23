@@ -409,6 +409,9 @@ func buildQueries(conf Config, req *plugin.CodeGenRequest, structs []Struct) ([]
 		if conf.QueryParameterLimit != nil {
 			qpl = int(*conf.QueryParameterLimit)
 		}
+		if qpl < 0 {
+			return nil, errors.New("invalid query parameter limit")
+		}
 		if len(query.Params) > qpl || qpl == 0 {
 			var cols []pyColumn
 			for _, p := range query.Params {
