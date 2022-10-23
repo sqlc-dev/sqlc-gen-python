@@ -276,7 +276,7 @@ func buildEnums(req *plugin.CodeGenRequest) []Enum {
 	return enums
 }
 
-func buildModels(req *plugin.CodeGenRequest) []Struct {
+func buildModels(conf Config, req *plugin.CodeGenRequest) []Struct {
 	var structs []Struct
 	for _, schema := range req.Catalog.Schemas {
 		if schema.Name == "pg_catalog" || schema.Name == "information_schema" {
@@ -290,10 +290,10 @@ func buildModels(req *plugin.CodeGenRequest) []Struct {
 				tableName = schema.Name + "_" + table.Rel.Name
 			}
 			structName := tableName
-			if !req.Settings.Python.EmitExactTableNames {
+			if !conf.EmitExactTableNames {
 				structName = inflection.Singular(inflection.SingularParams{
 					Name:       structName,
-					Exclusions: req.Settings.Python.InflectionExcludeTableNames,
+					Exclusions: conf.InflectionExcludeTableNames,
 				})
 			}
 			s := Struct{
@@ -1097,7 +1097,7 @@ func Generate(_ context.Context, req *plugin.Request) (*plugin.Response, error) 
 	}
 
 	enums := buildEnums(req)
-	models := buildModels(req)
+	models := buildModels(conf, req)
 	queries, err := buildQueries(conf, req, models)
 	if err != nil {
 		return nil, err
