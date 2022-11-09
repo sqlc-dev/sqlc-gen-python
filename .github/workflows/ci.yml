@@ -1,0 +1,18 @@
+name: make
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  build:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version: '1.19'
+    - run: wget https://github.com/tinygo-org/tinygo/releases/download/v0.26.0/tinygo_0.26.0_amd64.deb
+    - run: sudo dpkg -i tinygo_0.26.0_amd64.deb
+    - run: make
