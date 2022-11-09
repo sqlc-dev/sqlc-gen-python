@@ -1,4 +1,4 @@
-all: sqlc-gen-python sqlc-gen-python.wasm
+all: sqlc-gen-python
 
 sqlc-gen-python:
 	cd plugin && go build -o ~/bin/sqlc-gen-python ./main.go
