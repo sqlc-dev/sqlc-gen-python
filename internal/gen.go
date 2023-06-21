@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"buf.build/gen/go/sqlc/sqlc/protocolbuffers/go/protos/plugin"
 	easyjson "github.com/mailru/easyjson"
-	plugin "github.com/tabbed/sqlc-go/codegen"
 	"github.com/tabbed/sqlc-go/metadata"
 	"github.com/tabbed/sqlc-go/sdk"
 
@@ -192,15 +192,15 @@ func makePyType(req *plugin.CodeGenRequest, col *plugin.Column) pyType {
 func pyInnerType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 	columnType := sdk.DataType(col.Type)
 	for _, oride := range req.Settings.Overrides {
-		if !pyTypeIsSet(oride.PythonType) {
+		if !pyTypeIsSet(oride) {
 			continue
 		}
 		sameTable := sdk.Matches(oride, col.Table, req.Catalog.DefaultSchema)
 		if oride.Column != "" && sdk.MatchString(oride.ColumnName, col.Name) && sameTable {
-			return pyTypeString(oride.PythonType)
+			return oride.CodeType
 		}
 		if oride.DbType != "" && oride.DbType == columnType && oride.Nullable != (col.NotNull || col.IsArray) {
-			return pyTypeString(oride.PythonType)
+			return oride.CodeType
 		}
 	}
 
@@ -1091,7 +1091,7 @@ func HashComment(s string) string {
 	return "# " + strings.ReplaceAll(s, "\n", "\n# ")
 }
 
-func Generate(_ context.Context, req *plugin.Request) (*plugin.Response, error) {
+func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenResponse, error) {
 	var conf Config
 	if len(req.PluginOptions) > 0 {
 		if err := easyjson.Unmarshal(req.PluginOptions, &conf); err != nil {
@@ -1143,7 +1143,7 @@ func Generate(_ context.Context, req *plugin.Request) (*plugin.Response, error) 
 		output[name] = string(result.Python)
 	}
 
-	resp := plugin.Response{}
+	resp := plugin.CodeGenResponse{}
 
 	for filename, code := range output {
 		resp.Files = append(resp.Files, &plugin.File{

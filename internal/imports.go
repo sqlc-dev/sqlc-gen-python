@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tabbed/sqlc-go/codegen"
+	"buf.build/gen/go/sqlc/sqlc/protocolbuffers/go/protos/plugin"
 )
 
 type importSpec struct {
@@ -14,15 +14,8 @@ type importSpec struct {
 	Alias  string
 }
 
-func pyTypeIsSet(t *codegen.PythonType) bool {
-	return t.Module != "" || t.Name != ""
-}
-
-func pyTypeString(t *codegen.PythonType) string {
-	if t.Name != "" && t.Module == "" {
-		return t.Name
-	}
-	return t.Module + "." + t.Name
+func pyTypeIsSet(o *plugin.Override) bool {
+	return o.CodeType != ""
 }
 
 func (i importSpec) String() string {
@@ -39,7 +32,7 @@ func (i importSpec) String() string {
 }
 
 type importer struct {
-	Settings *codegen.Settings
+	Settings *plugin.Settings
 	Models   []Struct
 	Queries  []Query
 	Enums    []Enum
@@ -112,12 +105,17 @@ func (i *importer) modelImportSpecs() (map[string]importSpec, map[string]importS
 	pkg := make(map[string]importSpec)
 
 	for _, o := range i.Settings.Overrides {
-		if pyTypeIsSet(o.PythonType) && o.PythonType.Module != "" {
-			if modelUses(pyTypeString(o.PythonType)) {
-				pkg[o.PythonType.Module] = importSpec{Module: o.PythonType.Module}
+		if pyTypeIsSet(o) {
+			mod, _, found := strings.Cut(o.CodeType, ".")
+			if !found {
+				continue
+			}
+			if modelUses(o.CodeType) {
+				pkg[mod] = importSpec{Module: mod}
 			}
 		}
 	}
+
 	return std, pkg
 }
 
@@ -158,9 +156,13 @@ func (i *importer) queryImportSpecs(fileName string) (map[string]importSpec, map
 	}
 
 	for _, o := range i.Settings.Overrides {
-		if pyTypeIsSet(o.PythonType) && o.PythonType.Module != "" {
-			if queryUses(pyTypeString(o.PythonType)) {
-				pkg[o.PythonType.Module] = importSpec{Module: o.PythonType.Module}
+		if pyTypeIsSet(o) {
+			mod, _, found := strings.Cut(o.CodeType, ".")
+			if !found {
+				continue
+			}
+			if queryUses(o.CodeType) {
+				pkg[mod] = importSpec{Module: mod}
 			}
 		}
 	}

@@ -3,11 +3,11 @@ package python
 import (
 	"log"
 
-	"github.com/tabbed/sqlc-go/codegen"
+	"buf.build/gen/go/sqlc/sqlc/protocolbuffers/go/protos/plugin"
 	"github.com/tabbed/sqlc-go/sdk"
 )
 
-func postgresType(req *codegen.Request, col *codegen.Column) string {
+func postgresType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 	columnType := sdk.DataType(col.Type)
 
 	switch columnType {

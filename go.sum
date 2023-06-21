@@ -1,3 +1,5 @@
+buf.build/gen/go/sqlc/sqlc/protocolbuffers/go v1.30.0-20230621221448-196413f69ab3.1 h1:ze0HODAjPRXSkiqSpDTYq2baS4IVtRtDLSZY2p1ZCX4=
+buf.build/gen/go/sqlc/sqlc/protocolbuffers/go v1.30.0-20230621221448-196413f69ab3.1/go.mod h1:DSpReHp8PwHOeCfGymiiY4HSx2iVL358X7JRMciL7T0=
 github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
@@ -10,7 +12,9 @@ github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
 github.com/tabbed/sqlc-go v1.16.0 h1:EwPBXdGn5tyrLjcNiHRoQthWvJeF5NjG9Cx1WK5iFsY=
 github.com/tabbed/sqlc-go v1.16.0/go.mod h1:mqMU5duZRGz5Wp/qJXwkERf+MXgGOZ8BmW/tH9KyvWA=
+github.com/tabbed/sqlc-go v1.18.0 h1:GNE8b8xue8fKVptQnr3Z6DV8FqdokyDYML7O0kYtbe4=
+github.com/tabbed/sqlc-go v1.18.0/go.mod h1:qx8ocsmviBDyRfLNuJQtdu0f5oqa8XBjKxMldl+Wm24=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
-google.golang.org/protobuf v1.28.1 h1:d0NfwRgPtno5B1Wa6L2DAG+KivqkdutMf1UhdNx175w=
-google.golang.org/protobuf v1.28.1/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
+google.golang.org/protobuf v1.30.0 h1:kPPoIgf3TsEvrm0PFe15JQ+570QVxYzEvvHqChK+cng=
+google.golang.org/protobuf v1.30.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
