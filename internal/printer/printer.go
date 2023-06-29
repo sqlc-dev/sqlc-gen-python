@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tabbed/sqlc-gen-python/internal/ast"
+	"github.com/sqlc-dev/sqlc-gen-python/internal/ast"
 )
 
 type writer struct {

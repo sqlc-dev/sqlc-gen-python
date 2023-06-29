@@ -3024,7 +3024,7 @@ func file_python_ast_proto_init() {
 		File: protoimpl.DescBuilder{
 			// TinyGo does not support reflect, hardcode this for now
 			// GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			GoPackagePath: "github.com/tabbed/sqlc-gen-python/internal/ast",
+			GoPackagePath: "github.com/sqlc-dev/sqlc-gen-python/internal/ast",
 			RawDescriptor: file_python_ast_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   31,

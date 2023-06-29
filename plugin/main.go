@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/tabbed/sqlc-go/codegen"
+	"github.com/sqlc-dev/sqlc-go/codegen"
 
-	python "github.com/tabbed/sqlc-gen-python/internal"
+	python "github.com/sqlc-dev/sqlc-gen-python/internal"
 )
 
 func main() {

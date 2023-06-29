@@ -1,4 +1,4 @@
-module github.com/tabbed/sqlc-gen-python
+module github.com/sqlc-dev/sqlc-gen-python
 
 go 1.19
 
@@ -7,8 +7,11 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/jinzhu/inflection v1.0.0
 	github.com/mailru/easyjson v0.7.7
-	github.com/tabbed/sqlc-go v1.18.0
+	github.com/sqlc-dev/sqlc-go v1.18.1
 	google.golang.org/protobuf v1.30.0
 )
 
-require github.com/josharian/intern v1.0.0 // indirect
+require (
+	github.com/josharian/intern v1.0.0 // indirect
+	github.com/tabbed/sqlc-go v1.18.0 // indirect
+)

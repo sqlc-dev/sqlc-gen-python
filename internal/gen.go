@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	json "encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -10,14 +11,13 @@ import (
 	"strings"
 
 	"buf.build/gen/go/sqlc/sqlc/protocolbuffers/go/protos/plugin"
-	easyjson "github.com/mailru/easyjson"
-	"github.com/tabbed/sqlc-go/metadata"
-	"github.com/tabbed/sqlc-go/sdk"
+	"github.com/sqlc-dev/sqlc-go/metadata"
+	"github.com/sqlc-dev/sqlc-go/sdk"
 
-	pyast "github.com/tabbed/sqlc-gen-python/internal/ast"
-	"github.com/tabbed/sqlc-gen-python/internal/inflection"
-	"github.com/tabbed/sqlc-gen-python/internal/poet"
-	pyprint "github.com/tabbed/sqlc-gen-python/internal/printer"
+	pyast "github.com/sqlc-dev/sqlc-gen-python/internal/ast"
+	"github.com/sqlc-dev/sqlc-gen-python/internal/inflection"
+	"github.com/sqlc-dev/sqlc-gen-python/internal/poet"
+	pyprint "github.com/sqlc-dev/sqlc-gen-python/internal/printer"
 )
 
 type Constant struct {
@@ -1094,7 +1094,7 @@ func HashComment(s string) string {
 func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenResponse, error) {
 	var conf Config
 	if len(req.PluginOptions) > 0 {
-		if err := easyjson.Unmarshal(req.PluginOptions, &conf); err != nil {
+		if err := json.Unmarshal(req.PluginOptions, &conf); err != nil {
 			return nil, err
 		}
 	}

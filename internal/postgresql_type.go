@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"buf.build/gen/go/sqlc/sqlc/protocolbuffers/go/protos/plugin"
-	"github.com/tabbed/sqlc-go/sdk"
+	"github.com/sqlc-dev/sqlc-go/sdk"
 )
 
 func postgresType(req *plugin.CodeGenRequest, col *plugin.Column) string {
