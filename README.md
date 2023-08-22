@@ -16,6 +16,7 @@ sql:
     plugin: py
     options:
       package: authors
-      emit_sync_querier: true
-      emit_async_querier: true
+      emit_module: false
+      emit_generators: true
+      emit_async: false
 ```
