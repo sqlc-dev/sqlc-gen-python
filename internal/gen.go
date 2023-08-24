@@ -1047,7 +1047,13 @@ func HashComment(s string) string {
 }
 
 func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenResponse, error) {
-	var conf Config
+	// Setup our defaults for our Config struct and parse our config file
+	defaultModelsFileName := "models.py"
+	conf := Config{
+		OutputModelsFileName: &defaultModelsFileName,
+		OutputQuerierFile:    true,
+	}
+
 	if len(req.PluginOptions) > 0 {
 		if err := json.Unmarshal(req.PluginOptions, &conf); err != nil {
 			return nil, err
@@ -1086,26 +1092,34 @@ func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenRes
 	}
 
 	output := map[string]string{}
-	result := pyprint.Print(buildModelsTree(&tctx, i), pyprint.Options{})
-	tctx.SourceName = "models.py"
-	output["models.py"] = string(result.Python)
 
-	files := map[string]struct{}{}
-	for _, q := range queries {
-		files[q.SourceName] = struct{}{}
+	// Generate the model file.
+	if conf.OutputModelsFileName != nil {
+		result := pyprint.Print(buildModelsTree(&tctx, i), pyprint.Options{})
+		tctx.SourceName = *conf.OutputModelsFileName
+		output[*conf.OutputModelsFileName] = string(result.Python)
 	}
 
-	for source := range files {
-		tctx.SourceName = source
-		result := pyprint.Print(buildQueryTree(&tctx, i, source), pyprint.Options{})
-		name := source
-		if !strings.HasSuffix(name, ".py") {
-			name = strings.TrimSuffix(name, ".sql")
-			name += ".py"
+	// Generate for each .sql file a corresponding Python query file.
+	if conf.OutputQuerierFile {
+		files := map[string]struct{}{}
+		for _, q := range queries {
+			files[q.SourceName] = struct{}{}
 		}
-		output[name] = string(result.Python)
+
+		for source := range files {
+			tctx.SourceName = source
+			result := pyprint.Print(buildQueryTree(&tctx, i, source), pyprint.Options{})
+			name := source
+			if !strings.HasSuffix(name, ".py") {
+				name = strings.TrimSuffix(name, ".sql")
+				name += ".py"
+			}
+			output[name] = string(result.Python)
+		}
 	}
 
+	// Finally we send our outputs back to SQLC
 	resp := plugin.CodeGenResponse{}
 
 	for filename, code := range output {
