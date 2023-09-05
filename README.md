@@ -1,3 +1,7 @@
+# sqlc-gen-python-orm
+
+sqlc-gen-python-orm is a plugin for [sqlc](https://sqlc.dev/) that generates an ORM (now, support SQLAlchemy only) for Python.
+
 ## Usage
 
 ```yaml
@@ -19,3 +23,7 @@ sql:
       emit_sync_querier: true
       emit_async_querier: true
 ```
+
+## Refs
+
+- [sqlc plugin を書こう - 薄いブログ](https://orisano.hatenablog.com/entry/2023/09/06/010926)
