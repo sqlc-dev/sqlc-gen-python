@@ -9,4 +9,5 @@ type Config struct {
 	EmitPydanticModels          bool     `json:"emit_pydantic_models"`
 	QueryParameterLimit         *int32   `json:"query_parameter_limit"`
 	InflectionExcludeTableNames []string `json:"inflection_exclude_table_names"`
+	EmitSQLAlchemyModels        bool     `json:"emit_sqlalchemy_models"`
 }

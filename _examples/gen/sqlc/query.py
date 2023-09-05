@@ -7,7 +7,7 @@ from typing import AsyncIterator, Iterator, Optional
 import sqlalchemy
 import sqlalchemy.ext.asyncio
 
-from authors import models
+from . import models
 
 
 CREATE_AUTHOR = """-- name: create_author \\:one
