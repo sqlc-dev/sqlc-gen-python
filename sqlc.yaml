@@ -1,0 +1,19 @@
+version: '2'
+plugins:
+- name: py
+  wasm:
+    url: file://dist/sqlc-gen-python-orm.wasm
+    sha256: a86cd9be5ea6286eb92e6b7896d6450fe961de5aff8235d98dec0047aceeb27c
+sql:
+- schema: "_examples/schema.sql"
+  queries: "_examples/query.sql"
+  engine: postgresql
+  codegen:
+  - out: "_examples/gen/sqlc"
+    plugin: py
+    options:
+      package: authors
+      emit_sync_querier: true
+      emit_async_querier: true
+      emit_pydantic_models: true
+      emit_sqlalchemy_models: true
