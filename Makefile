@@ -21,6 +21,10 @@ generate: sqlc.yaml
 
 .PHONY: release
 release: dist/sqlc-gen-python-orm.wasm dist/sqlc-gen-python-orm.wasm.sha256
+	gh release create "v${VERSION}" dist/sqlc-gen-python-orm.wasm dist/sqlc-gen-python-orm.wasm.sha256
+
+.PHONY: release
+release-overwrite: dist/sqlc-gen-python-orm.wasm dist/sqlc-gen-python-orm.wasm.sha256
 	gh release delete -y --cleanup-tag "v${VERSION}"
 	gh release create "v${VERSION}" dist/sqlc-gen-python-orm.wasm dist/sqlc-gen-python-orm.wasm.sha256
 
