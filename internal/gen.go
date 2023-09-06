@@ -623,15 +623,8 @@ func sqlalchemyNode(name string) *pyast.ClassDef {
 		Name: name,
 		Bases: []*pyast.Node{
 			{
-				Node: &pyast.Node_Attribute{
-					Attribute: &pyast.Attribute{
-						Value: &pyast.Node{
-							Node: &pyast.Node_Name{
-								Name: &pyast.Name{Id: "hello"},
-							},
-						},
-						Attr: "Base",
-					},
+				Node: &pyast.Node_Name{
+					Name: &pyast.Name{Id: "Base"},
 				},
 			},
 		},
@@ -643,15 +636,8 @@ func sqlalchemyBaseNode() *pyast.ClassDef {
 		Name: "Base",
 		Bases: []*pyast.Node{
 			{
-				Node: &pyast.Node_Attribute{
-					Attribute: &pyast.Attribute{
-						Value: &pyast.Node{
-							Node: &pyast.Node_Name{
-								Name: &pyast.Name{Id: "sqlalchemy.orm"},
-							},
-						},
-						Attr: "DeclarativeBase",
-					},
+				Node: &pyast.Node_Name{
+					Name: &pyast.Name{Id: "DeclarativeBase"},
 				},
 			},
 		},
@@ -664,6 +650,18 @@ func fieldNode(f Field) *pyast.Node {
 			AnnAssign: &pyast.AnnAssign{
 				Target:     &pyast.Name{Id: f.Name},
 				Annotation: f.Type.Annotation(),
+				Comment:    f.Comment,
+			},
+		},
+	}
+}
+
+func ormFieldNode(f Field) *pyast.Node {
+	return &pyast.Node{
+		Node: &pyast.Node_AnnAssign{
+			AnnAssign: &pyast.AnnAssign{
+				Target:     &pyast.Name{Id: f.Name},
+				Annotation: subscriptNode("Mapped", f.Type.Annotation()),
 				Comment:    f.Comment,
 			},
 		},
@@ -716,6 +714,7 @@ func buildImportGroup(specs map[string]importSpec) *pyast.Node {
 	var body []*pyast.Node
 	for _, spec := range buildImportBlock2(specs) {
 		if len(spec.Names) > 0 && spec.Names[0] != "" {
+			// e.g. from sqlalchemy import create_engine
 			imp := &pyast.ImportFrom{
 				Module: spec.Module,
 			}
@@ -834,6 +833,7 @@ func buildOrmTree(ctx *pyTmplCtx, i *importer) *pyast.Node {
 	}
 
 	// generate Base class
+	// Base class is a dependency for all orm models
 	def := sqlalchemyBaseNode()
 	def.Body = append(def.Body, fieldPassNode())
 	mod.Body = append(mod.Body, &pyast.Node{
@@ -842,7 +842,7 @@ func buildOrmTree(ctx *pyTmplCtx, i *importer) *pyast.Node {
 		},
 	})
 
-	for _, m := range ctx.Orms {
+	for _, m := range ctx.Models {
 		def := sqlalchemyNode(m.Name)
 		if m.Comment != "" {
 			def.Body = append(def.Body, &pyast.Node{
@@ -853,8 +853,11 @@ func buildOrmTree(ctx *pyTmplCtx, i *importer) *pyast.Node {
 				},
 			})
 		}
+		// add table name as class attribute
+		def.Body = append(def.Body, assignNode("__tablename__", poet.Constant(m.Table.Name)))
+
 		for _, f := range m.Fields {
-			def.Body = append(def.Body, fieldNode(f))
+			def.Body = append(def.Body, ormFieldNode(f))
 		}
 		mod.Body = append(mod.Body, &pyast.Node{
 			Node: &pyast.Node_ClassDef{
@@ -1190,7 +1193,6 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 type pyTmplCtx struct {
 	SqlcVersion string
 	Models      []Struct
-	Orms        []Struct
 	Queries     []Query
 	Enums       []Enum
 	SourceName  string
@@ -1230,7 +1232,6 @@ func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenRes
 
 	tctx := pyTmplCtx{
 		Models:      models,
-		Orms:        models,
 		Queries:     queries,
 		Enums:       enums,
 		SqlcVersion: req.SqlcVersion,

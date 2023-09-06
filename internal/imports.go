@@ -121,6 +121,7 @@ func (i *importer) modelImportSpecs() (map[string]importSpec, map[string]importS
 	return std, pkg
 }
 
+// ormImportSpecs returns the standard and package imports for the ORM.
 func (i *importer) ormImportSpecs() (map[string]importSpec, map[string]importSpec) {
 	modelUses := func(name string) bool {
 		for _, model := range i.Models {
@@ -133,7 +134,9 @@ func (i *importer) ormImportSpecs() (map[string]importSpec, map[string]importSpe
 
 	std := stdImports(modelUses)
 	if i.C.EmitSQLAlchemyModels {
-		std["sqlalchemy"] = importSpec{Module: "sqlalchemy"}
+		std["sqlalchemy.orm.DeclarativeBase"] = importSpec{Module: "sqlalchemy.orm", Name: "DeclarativeBase"}
+		std["sqlalchemy.orm.Mapped"] = importSpec{Module: "sqlalchemy.orm", Name: "Mapped"}
+		std["sqlalchemy.orm.mapped_column"] = importSpec{Module: "sqlalchemy.orm", Name: "mapped_column"}
 	}
 	if len(i.Enums) > 0 {
 		std["enum"] = importSpec{Module: "enum"}

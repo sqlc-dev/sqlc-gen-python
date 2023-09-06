@@ -130,6 +130,18 @@ func (w *writer) printNode(node *ast.Node, indent int32) {
 	}
 }
 
+func (w *writer) printAnnAssignWithMapped(aa *ast.AnnAssign, indent int32) {
+	if aa.Comment != "" {
+		w.print("# ")
+		w.print(aa.Comment)
+		w.print("\n")
+		w.printIndent(indent)
+	}
+	w.printName(aa.Target, indent)
+	w.print(": ")
+	w.printNode(aa.Annotation, indent)
+}
+
 func (w *writer) printAnnAssign(aa *ast.AnnAssign, indent int32) {
 	if aa.Comment != "" {
 		w.print("# ")
