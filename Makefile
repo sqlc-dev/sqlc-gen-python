@@ -5,7 +5,7 @@ GOBIN ?= $(shell go env GOPATH)/bin
 
 .PHONY: show-version
 show-version: $(GOBIN)/gobump
-	@gobump show -r .
+	@gobump show -r cmd/sqlc-gen-python-orm
 
 $(GOBIN)/gobump:
 	@go install github.com/x-motemen/gobump/cmd/gobump@latest
@@ -21,8 +21,8 @@ generate: sqlc.yaml
 
 .PHONY: release
 release: dist/sqlc-gen-ts-d1.wasm dist/sqlc-gen-ts-d1.wasm.sha256
-	gh release delete -y --cleanup-tag v0.0.0-a
-	gh release create v0.0.0-a dist/sqlc-gen-ts-d1.wasm dist/sqlc-gen-ts-d1.wasm.sha256
+	gh release delete -y --cleanup-tag "v${VERSION}"
+	gh release create "v${VERSION}" dist/sqlc-gen-python-orm.wasm dist/sqlc-gen-python-orm.wasm.sha256
 
 .PHONY: clean
 clean:
