@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/sqlc-dev/sqlc-gen-python/internal/ast"
+	"github.com/zztkm/sqlc-gen-python-orm/internal/ast"
 )
 
 type testcase struct {
