@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sqlc-dev/sqlc-gen-python/internal/ast"
+	"github.com/zztkm/sqlc-gen-python-orm/internal/ast"
 )
 
 type writer struct {
@@ -128,6 +128,18 @@ func (w *writer) printNode(node *ast.Node, indent int32) {
 		panic(n)
 
 	}
+}
+
+func (w *writer) printAnnAssignWithMapped(aa *ast.AnnAssign, indent int32) {
+	if aa.Comment != "" {
+		w.print("# ")
+		w.print(aa.Comment)
+		w.print("\n")
+		w.printIndent(indent)
+	}
+	w.printName(aa.Target, indent)
+	w.print(": ")
+	w.printNode(aa.Annotation, indent)
 }
 
 func (w *writer) printAnnAssign(aa *ast.AnnAssign, indent int32) {
