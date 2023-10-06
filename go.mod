@@ -9,5 +9,3 @@ require (
 	github.com/sqlc-dev/sqlc-go v1.18.1
 	google.golang.org/protobuf v1.31.0
 )
-
-require github.com/tabbed/sqlc-go v1.18.0 // indirect

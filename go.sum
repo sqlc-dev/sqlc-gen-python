@@ -8,8 +8,6 @@ github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
 github.com/sqlc-dev/sqlc-go v1.18.1 h1:mmudfN9G938piXnZGvrMEHp9RF4dD+InQIY1BaoQOvU=
 github.com/sqlc-dev/sqlc-go v1.18.1/go.mod h1:v6c+FMh0YrbT9RU9+S5Sh62VXmVhdpTsQoXn1QxH294=
-github.com/tabbed/sqlc-go v1.18.0 h1:GNE8b8xue8fKVptQnr3Z6DV8FqdokyDYML7O0kYtbe4=
-github.com/tabbed/sqlc-go v1.18.0/go.mod h1:qx8ocsmviBDyRfLNuJQtdu0f5oqa8XBjKxMldl+Wm24=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.30.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
