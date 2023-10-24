@@ -207,6 +207,8 @@ func pyInnerType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 	switch req.Settings.Engine {
 	case "postgresql":
 		return postgresType(req, col)
+	case "mysql":
+		return mysqlType(req, col)
 	default:
 		log.Println("unsupported engine type")
 		return "Any"
