@@ -1,5 +1,5 @@
-buf.build/gen/go/sqlc/sqlc/protocolbuffers/go v1.31.0-20231002190240-3f2d312ab6fd.1 h1:94JzirpGhebc3++MqmvWY0fi9TJxlle5M52NO4pTEZY=
-buf.build/gen/go/sqlc/sqlc/protocolbuffers/go v1.31.0-20231002190240-3f2d312ab6fd.1/go.mod h1:x7kMRcmAiYQXko+NDqLP2agondNlbHKUNGPXqU1nrOU=
+buf.build/gen/go/sqlc/sqlc/protocolbuffers/go v1.31.0-20231002190240-3f2d312ab6fd.2 h1:TR08+UayYD/E75DkpfsPaEhR3Hrs2ujmDu81HQdysu4=
+buf.build/gen/go/sqlc/sqlc/protocolbuffers/go v1.31.0-20231002190240-3f2d312ab6fd.2/go.mod h1:x7kMRcmAiYQXko+NDqLP2agondNlbHKUNGPXqU1nrOU=
 github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
