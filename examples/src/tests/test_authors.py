@@ -8,7 +8,7 @@ from dbtest.migrations import apply_migrations, apply_migrations_async
 
 
 def test_authors(db: sqlalchemy.engine.Connection):
-    apply_migrations(db, [os.path.dirname(__file__) + "/../../../authors/postgresql/schema.sql"])
+    apply_migrations(db, [os.path.dirname(__file__) + "/../authors/schema.sql"])
 
     querier = query.Querier(db)
 
@@ -32,7 +32,7 @@ def test_authors(db: sqlalchemy.engine.Connection):
 
 @pytest.mark.asyncio
 async def test_authors_async(async_db: sqlalchemy.ext.asyncio.AsyncConnection):
-    await apply_migrations_async(async_db, [os.path.dirname(__file__) + "/../../../authors/postgresql/schema.sql"])
+    await apply_migrations_async(async_db, [os.path.dirname(__file__) + "/../authors/schema.sql"])
 
     querier = query.AsyncQuerier(async_db)
 

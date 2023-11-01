@@ -10,7 +10,7 @@ from dbtest.migrations import apply_migrations_async
 
 @pytest.mark.asyncio
 async def test_books(async_db: sqlalchemy.ext.asyncio.AsyncConnection):
-    await apply_migrations_async(async_db, [os.path.dirname(__file__) + "/../../../booktest/postgresql/schema.sql"])
+    await apply_migrations_async(async_db, [os.path.dirname(__file__) + "/../booktest/schema.sql"])
 
     querier = query.AsyncQuerier(async_db)
 
