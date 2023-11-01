@@ -18,3 +18,5 @@ jobs:
         sqlc-version: '1.23.0'
     - run: make
     - run: make test
+    - run: sqlc diff
+      working-directory: examples
