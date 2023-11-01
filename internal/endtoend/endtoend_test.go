@@ -67,7 +67,7 @@ func TestGenerate(t *testing.T) {
 			cmd := exec.Command(sqlc, "diff")
 			cmd.Dir = dir
 			got, err := cmd.CombinedOutput()
-			if diff := cmp.Diff(want, got); diff != "" {
+			if diff := cmp.Diff(string(want), string(got)); diff != "" {
 				t.Errorf("sqlc diff mismatch (-want +got):\n%s", diff)
 			}
 			if len(want) == 0 && err != nil {
