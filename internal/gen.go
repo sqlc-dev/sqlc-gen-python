@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"buf.build/gen/go/sqlc/sqlc/protocolbuffers/go/protos/plugin"
 	"github.com/sqlc-dev/sqlc-go/metadata"
+	"github.com/sqlc-dev/sqlc-go/plugin"
 	"github.com/sqlc-dev/sqlc-go/sdk"
 
 	pyast "github.com/sqlc-dev/sqlc-gen-python/internal/ast"
@@ -180,7 +180,7 @@ func (q Query) ArgDictNode() *pyast.Node {
 	}
 }
 
-func makePyType(req *plugin.CodeGenRequest, col *plugin.Column) pyType {
+func makePyType(req *plugin.GenerateRequest, col *plugin.Column) pyType {
 	typ := pyInnerType(req, col)
 	return pyType{
 		InnerType: typ,
@@ -189,21 +189,7 @@ func makePyType(req *plugin.CodeGenRequest, col *plugin.Column) pyType {
 	}
 }
 
-func pyInnerType(req *plugin.CodeGenRequest, col *plugin.Column) string {
-	columnType := sdk.DataType(col.Type)
-	for _, oride := range req.Settings.Overrides {
-		if !pyTypeIsSet(oride) {
-			continue
-		}
-		sameTable := sdk.Matches(oride, col.Table, req.Catalog.DefaultSchema)
-		if oride.Column != "" && sdk.MatchString(oride.ColumnName, col.Name) && sameTable {
-			return oride.CodeType
-		}
-		if oride.DbType != "" && oride.DbType == columnType && oride.Nullable != (col.NotNull || col.IsArray) {
-			return oride.CodeType
-		}
-	}
-
+func pyInnerType(req *plugin.GenerateRequest, col *plugin.Column) string {
 	switch req.Settings.Engine {
 	case "postgresql":
 		return postgresType(req, col)
@@ -214,9 +200,6 @@ func pyInnerType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 }
 
 func modelName(name string, settings *plugin.Settings) string {
-	if rename := settings.Rename[name]; rename != "" {
-		return rename
-	}
 	out := ""
 	for _, p := range strings.Split(name, "_") {
 		out += strings.Title(p)
@@ -243,7 +226,7 @@ func pyEnumValueName(value string) string {
 	return strings.ToUpper(id)
 }
 
-func buildEnums(req *plugin.CodeGenRequest) []Enum {
+func buildEnums(req *plugin.GenerateRequest) []Enum {
 	var enums []Enum
 	for _, schema := range req.Catalog.Schemas {
 		if schema.Name == "pg_catalog" || schema.Name == "information_schema" {
@@ -276,7 +259,7 @@ func buildEnums(req *plugin.CodeGenRequest) []Enum {
 	return enums
 }
 
-func buildModels(conf Config, req *plugin.CodeGenRequest) []Struct {
+func buildModels(conf Config, req *plugin.GenerateRequest) []Struct {
 	var structs []Struct
 	for _, schema := range req.Catalog.Schemas {
 		if schema.Name == "pg_catalog" || schema.Name == "information_schema" {
@@ -338,7 +321,7 @@ type pyColumn struct {
 	*plugin.Column
 }
 
-func columnsToStruct(req *plugin.CodeGenRequest, name string, columns []pyColumn) *Struct {
+func columnsToStruct(req *plugin.GenerateRequest, name string, columns []pyColumn) *Struct {
 	gs := Struct{
 		Name: name,
 	}
@@ -380,7 +363,7 @@ func sqlalchemySQL(s, engine string) string {
 	return s
 }
 
-func buildQueries(conf Config, req *plugin.CodeGenRequest, structs []Struct) ([]Query, error) {
+func buildQueries(conf Config, req *plugin.GenerateRequest, structs []Struct) ([]Query, error) {
 	qs := make([]Query, 0, len(req.Queries))
 	for _, query := range req.Queries {
 		if query.Name == "" {
@@ -1091,7 +1074,7 @@ func HashComment(s string) string {
 	return "# " + strings.ReplaceAll(s, "\n", "\n# ")
 }
 
-func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenResponse, error) {
+func Generate(_ context.Context, req *plugin.GenerateRequest) (*plugin.GenerateResponse, error) {
 	var conf Config
 	if len(req.PluginOptions) > 0 {
 		if err := json.Unmarshal(req.PluginOptions, &conf); err != nil {
@@ -1107,11 +1090,10 @@ func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenRes
 	}
 
 	i := &importer{
-		Settings: req.Settings,
-		Models:   models,
-		Queries:  queries,
-		Enums:    enums,
-		C:        conf,
+		Models:  models,
+		Queries: queries,
+		Enums:   enums,
+		C:       conf,
 	}
 
 	tctx := pyTmplCtx{
@@ -1143,7 +1125,7 @@ func Generate(_ context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenRes
 		output[name] = string(result.Python)
 	}
 
-	resp := plugin.CodeGenResponse{}
+	resp := plugin.GenerateResponse{}
 
 	for filename, code := range output {
 		resp.Files = append(resp.Files, &plugin.File{

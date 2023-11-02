@@ -4,18 +4,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"buf.build/gen/go/sqlc/sqlc/protocolbuffers/go/protos/plugin"
 )
 
 type importSpec struct {
 	Module string
 	Name   string
 	Alias  string
-}
-
-func pyTypeIsSet(o *plugin.Override) bool {
-	return o.CodeType != ""
 }
 
 func (i importSpec) String() string {
@@ -32,11 +26,10 @@ func (i importSpec) String() string {
 }
 
 type importer struct {
-	Settings *plugin.Settings
-	Models   []Struct
-	Queries  []Query
-	Enums    []Enum
-	C        Config
+	Models  []Struct
+	Queries []Query
+	Enums   []Enum
+	C       Config
 }
 
 func structUses(name string, s Struct) bool {
@@ -104,18 +97,6 @@ func (i *importer) modelImportSpecs() (map[string]importSpec, map[string]importS
 
 	pkg := make(map[string]importSpec)
 
-	for _, o := range i.Settings.Overrides {
-		if pyTypeIsSet(o) {
-			mod, _, found := strings.Cut(o.CodeType, ".")
-			if !found {
-				continue
-			}
-			if modelUses(o.CodeType) {
-				pkg[mod] = importSpec{Module: mod}
-			}
-		}
-	}
-
 	return std, pkg
 }
 
@@ -153,18 +134,6 @@ func (i *importer) queryImportSpecs(fileName string) (map[string]importSpec, map
 	pkg["sqlalchemy"] = importSpec{Module: "sqlalchemy"}
 	if i.C.EmitAsyncQuerier {
 		pkg["sqlalchemy.ext.asyncio"] = importSpec{Module: "sqlalchemy.ext.asyncio"}
-	}
-
-	for _, o := range i.Settings.Overrides {
-		if pyTypeIsSet(o) {
-			mod, _, found := strings.Cut(o.CodeType, ".")
-			if !found {
-				continue
-			}
-			if queryUses(o.CodeType) {
-				pkg[mod] = importSpec{Module: mod}
-			}
-		}
 	}
 
 	queryValueModelImports := func(qv QueryValue) {
