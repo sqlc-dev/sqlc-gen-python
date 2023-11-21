@@ -9,7 +9,7 @@ This softwaer forked from [sqlc-gen-python](https://github.com/sqlc-dev/sqlc-gen
 get sha256 hash of wasm file
 
 ```bash
-curl -sSL https://github.com/zztkm/sqlc-gen-python-orm/releases/download/v0.0.1/sqlc-gen-python-orm.wasm.sha256
+curl -sSL https://github.com/veltiosoft/sqlc-gen-python-orm/releases/download/v0.0.1/sqlc-gen-python-orm.wasm.sha256
 ```
 
 add plugin to sqlc.yaml
@@ -18,7 +18,7 @@ version: '2'
 plugins:
 - name: py
   wasm:
-    url: https://github.com/zztkm/sqlc-gen-python-orm/releases/download/v0.0.1/sqlc-gen-python-orm.wasm
+    url: https://github.com/veltiosoft/sqlc-gen-python-orm/releases/download/v0.0.1/sqlc-gen-python-orm.wasm
     sha256: <sha256 hash>
 sql:
 - schema: "schema.sql"
