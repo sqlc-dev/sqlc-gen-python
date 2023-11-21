@@ -78,6 +78,8 @@ func queryValueUses(name string, qv QueryValue) bool {
 func (i *importer) Imports(fileName string) []string {
 	if fileName == "models.py" {
 		return i.modelImports()
+	} else if fileName == "orm.py" {
+		return i.ormImports()
 	}
 	return i.queryImports(fileName)
 }
@@ -119,8 +121,56 @@ func (i *importer) modelImportSpecs() (map[string]importSpec, map[string]importS
 	return std, pkg
 }
 
+// ormImportSpecs returns the standard and package imports for the ORM.
+func (i *importer) ormImportSpecs() (map[string]importSpec, map[string]importSpec) {
+	modelUses := func(name string) bool {
+		for _, model := range i.Models {
+			if structUses(name, model) {
+				return true
+			}
+		}
+		return false
+	}
+
+	std := stdImports(modelUses)
+	if i.C.EmitSQLAlchemyModels {
+		std["sqlalchemy.orm.DeclarativeBase"] = importSpec{Module: "sqlalchemy.orm", Name: "DeclarativeBase"}
+		std["sqlalchemy.orm.Mapped"] = importSpec{Module: "sqlalchemy.orm", Name: "Mapped"}
+		std["sqlalchemy.orm.mapped_column"] = importSpec{Module: "sqlalchemy.orm", Name: "mapped_column"}
+	}
+	if len(i.Enums) > 0 {
+		std["enum"] = importSpec{Module: "enum"}
+	}
+
+	pkg := make(map[string]importSpec)
+
+	for _, o := range i.Settings.Overrides {
+		if pyTypeIsSet(o) {
+			mod, _, found := strings.Cut(o.CodeType, ".")
+			if !found {
+				continue
+			}
+			if modelUses(o.CodeType) {
+				pkg[mod] = importSpec{Module: mod}
+			}
+		}
+	}
+
+	return std, pkg
+}
+
 func (i *importer) modelImports() []string {
 	std, pkg := i.modelImportSpecs()
+	importLines := []string{
+		buildImportBlock(std),
+		"",
+		buildImportBlock(pkg),
+	}
+	return importLines
+}
+
+func (i *importer) ormImports() []string {
+	std, pkg := i.ormImportSpecs()
 	importLines := []string{
 		buildImportBlock(std),
 		"",

@@ -1,4 +1,4 @@
-module github.com/sqlc-dev/sqlc-gen-python
+module github.com/zztkm/sqlc-gen-python-orm
 
 go 1.19
 
