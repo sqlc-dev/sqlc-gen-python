@@ -647,8 +647,9 @@ type AnnAssign struct {
 
 	Target     *Name  `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
 	Annotation *Node  `protobuf:"bytes,2,opt,name=annotation,proto3" json:"annotation,omitempty"`
-	Simple     int32  `protobuf:"varint,3,opt,name=simple,proto3" json:"simple,omitempty"`
-	Comment    string `protobuf:"bytes,4,opt,name=Comment,json=comment,proto3" json:"Comment,omitempty"`
+	Value      *Node   `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
+	Simple     int32  `protobuf:"varint,4,opt,name=simple,proto3" json:"simple,omitempty"`
+	Comment    string `protobuf:"bytes,5,opt,name=Comment,json=comment,proto3" json:"Comment,omitempty"`
 }
 
 func (x *AnnAssign) Reset() {
@@ -693,6 +694,13 @@ func (x *AnnAssign) GetTarget() *Name {
 func (x *AnnAssign) GetAnnotation() *Node {
 	if x != nil {
 		return x.Annotation
+	}
+	return nil
+}
+
+func (x *AnnAssign) GetValue() *Node {
+	if x != nil {
+		return x.Value
 	}
 	return nil
 }

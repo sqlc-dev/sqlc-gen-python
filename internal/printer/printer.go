@@ -140,6 +140,10 @@ func (w *writer) printAnnAssign(aa *ast.AnnAssign, indent int32) {
 	w.printName(aa.Target, indent)
 	w.print(": ")
 	w.printNode(aa.Annotation, indent)
+	if aa.Value != nil {
+		w.print(" = ")
+		w.printNode(aa.Value, indent)
+	}
 }
 
 func (w *writer) printArg(a *ast.Arg, indent int32) {

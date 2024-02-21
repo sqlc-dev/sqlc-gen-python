@@ -702,12 +702,23 @@ func pydanticNode(name string) *pyast.ClassDef {
 	}
 }
 
-func fieldNode(f Field) *pyast.Node {
+func fieldNode(f Field, defaultNone bool) *pyast.Node {
+	// TODO: Current AST is showing limitation as annotated assign does not support a value :'(, manually edited :'(
+	var value *pyast.Node = nil
+	if defaultNone && f.Type.IsNull {
+		value = &pyast.Node{
+			Node: &pyast.Node_Name{
+				Name: &pyast.Name{Id: "None"},
+			},
+		}
+	}
+
 	return &pyast.Node{
 		Node: &pyast.Node_AnnAssign{
 			AnnAssign: &pyast.AnnAssign{
 				Target:     &pyast.Name{Id: f.Name},
 				Annotation: f.Type.Annotation(),
+				Value:      value,
 				Comment:    f.Comment,
 			},
 		},
@@ -825,7 +836,7 @@ func buildModelsTree(ctx *pyTmplCtx, i *importer) *pyast.Node {
 			})
 		}
 		for _, f := range m.Fields {
-			def.Body = append(def.Body, fieldNode(f))
+			def.Body = append(def.Body, fieldNode(f, false))
 		}
 		mod.Body = append(mod.Body, &pyast.Node{
 			Node: &pyast.Node_ClassDef{
@@ -904,6 +915,8 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 		}
 		queryText := fmt.Sprintf("-- name: %s \\\\%s\n%s\n", q.MethodName, q.Cmd, q.SQL)
 		mod.Body = append(mod.Body, assignNode(q.ConstantName, poet.Constant(queryText)))
+
+		// Generate params structures
 		for _, arg := range q.Args {
 			if arg.EmitStruct() {
 				var def *pyast.ClassDef
@@ -912,8 +925,18 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 				} else {
 					def = dataclassNode(arg.Struct.Name)
 				}
-				for _, f := range arg.Struct.Fields {
-					def.Body = append(def.Body, fieldNode(f))
+
+				// We need a copy as we want to make sure that nullable params are at the end of the dataclass
+				fields := make([]Field, len(arg.Struct.Fields))
+				copy(fields, arg.Struct.Fields)
+
+				// Place all nullable fields at the end and try to keep the original order as much as possible
+				sort.SliceStable(fields, func(i int, j int) bool {
+					return (fields[j].Type.IsNull && fields[i].Type.IsNull != fields[j].Type.IsNull) || i < j
+				})
+
+				for _, f := range fields {
+					def.Body = append(def.Body, fieldNode(f, true))
 				}
 				mod.Body = append(mod.Body, poet.Node(def))
 			}
@@ -926,7 +949,7 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 				def = dataclassNode(q.Ret.Struct.Name)
 			}
 			for _, f := range q.Ret.Struct.Fields {
-				def.Body = append(def.Body, fieldNode(f))
+				def.Body = append(def.Body, fieldNode(f, false))
 			}
 			mod.Body = append(mod.Body, poet.Node(def))
 		}
