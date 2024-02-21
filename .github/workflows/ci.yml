@@ -1,6 +1,8 @@
 name: go
 on:
   push:
+    tags:
+      - v*
     branches:
       - main
   pull_request:
@@ -22,7 +24,30 @@ jobs:
     - run: sqlc diff
       working-directory: examples
 
-    - uses: actions/upload-artifact@v3
+    - name: Generate checksum
+      id: checksum
+      run: |-
+        echo "sha256=$(sha256sum bin/sqlc-gen-python.wasm | awk '{ print $1 }')" >> $GITHUB_OUTPUT
+
+    - uses: actions/upload-artifact@v4
       with:
         name: sqlc-gen-python
-        path: plugin/sqlc-gen-python.wasm
+        path: bin/sqlc-gen-python.wasm
+
+    - name: Release the build on tag
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        body: |
+          # Configuration
+          ```yaml
+          version: '2'
+          plugins:
+          - name: py
+            wasm:
+              url: ${{ github.server_url }}/${{ github.repository}}/releases/download/${{ github.ref_name }}/sqlc-gen-python.wasm
+              sha256: ${{ steps.checksum.outputs.sha256 }}
+          ```
+        generate_release_notes: true
+        files: |
+          bin/sqlc-gen-python.wasm
