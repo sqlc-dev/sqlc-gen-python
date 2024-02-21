@@ -83,7 +83,7 @@ func (w *writer) printNode(node *ast.Node, indent int32) {
 		w.printNode(n.Expr.Value, indent)
 
 	case *ast.Node_For:
-		w.printFor(n.For, indent)
+		w.printFor(n.For, false, indent)
 
 	case *ast.Node_FunctionDef:
 		w.printFunctionDef(n.FunctionDef, indent)
@@ -140,6 +140,10 @@ func (w *writer) printAnnAssign(aa *ast.AnnAssign, indent int32) {
 	w.printName(aa.Target, indent)
 	w.print(": ")
 	w.printNode(aa.Annotation, indent)
+	if aa.Value != nil {
+		w.print(" = ")
+		w.printNode(aa.Value, indent)
+	}
 }
 
 func (w *writer) printArg(a *ast.Arg, indent int32) {
@@ -162,12 +166,11 @@ func (w *writer) printAssign(a *ast.Assign, indent int32) {
 }
 
 func (w *writer) printAsyncFor(n *ast.AsyncFor, indent int32) {
-	w.print("async ")
 	w.printFor(&ast.For{
 		Target: n.Target,
 		Iter:   n.Iter,
 		Body:   n.Body,
-	}, indent)
+	}, true, indent)
 }
 
 func (w *writer) printAsyncFunctionDef(afd *ast.AsyncFunctionDef, indent int32) {
@@ -341,17 +344,45 @@ func (w *writer) printDict(d *ast.Dict, indent int32) {
 	w.print("}")
 }
 
-func (w *writer) printFor(n *ast.For, indent int32) {
-	w.print("for ")
-	w.printNode(n.Target, indent)
-	w.print(" in ")
-	w.printNode(n.Iter, indent)
-	w.print(":\n")
-	for i, node := range n.Body {
+func (w *writer) printFor(n *ast.For, isAsync bool, indent int32) {
+	// We should always have a body
+	if len(n.Body) <= 0 {
+		panic(n)
+	}
+
+	// TODO: How to better support list comprehension? Maybe add a flag to AST node ForNode and AsyncNode?
+	_, isCall := n.Body[0].Node.(*ast.Node_Call)
+	if len(n.Body) == 1 && isCall {
+		w.print("[\n")
 		w.printIndent(indent + 1)
-		w.printNode(node, indent+1)
-		if i != len(n.Body)-1 {
-			w.print("\n")
+		w.printNode(n.Body[0], indent+1)
+		w.print("\n")
+		w.printIndent(indent + 1)
+		if isAsync {
+			w.print("async ")
+		}
+		w.print("for ")
+		w.printNode(n.Target, indent)
+		w.print(" in ")
+		w.printNode(n.Iter, indent)
+		w.print("\n")
+		w.printIndent(indent)
+		w.print("]\n")
+	} else {
+		if isAsync {
+			w.print("async ")
+		}
+		w.print("for ")
+		w.printNode(n.Target, indent)
+		w.print(" in ")
+		w.printNode(n.Iter, indent)
+		w.print(":\n")
+		for i, node := range n.Body {
+			w.printIndent(indent + 1)
+			w.printNode(node, indent+1)
+			if i != len(n.Body)-1 {
+				w.print("\n")
+			}
 		}
 	}
 }
@@ -455,14 +486,20 @@ func (w *writer) printModule(mod *ast.Module, indent int32) {
 			_, isImport := mod.Body[i-1].Node.(*ast.Node_ImportGroup)
 			prevIsImport = isImport
 		}
+
 		_, isClassDef := node.Node.(*ast.Node_ClassDef)
+		_, isFunctionDef := node.Node.(*ast.Node_FunctionDef)
+		_, isAsyncFunctionDef := node.Node.(*ast.Node_AsyncFunctionDef)
 		_, isAssign := node.Node.(*ast.Node_Assign)
+
 		if isClassDef || isAssign {
 			if prevIsImport {
 				w.print("\n")
 			} else {
 				w.print("\n\n")
 			}
+		} else if isAsyncFunctionDef || isFunctionDef {
+			w.print("\n\n\n")
 		}
 		w.printNode(node, indent)
 		if isAssign {
