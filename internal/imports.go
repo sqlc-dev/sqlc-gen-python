@@ -132,7 +132,7 @@ func (i *importer) queryImportSpecs(fileName string) (map[string]importSpec, map
 
 	pkg := make(map[string]importSpec)
 	pkg["sqlalchemy"] = importSpec{Module: "sqlalchemy"}
-	if i.C.EmitAsync {
+	if i.C.EmitAsync || i.C.EmitAsyncQuerier {
 		pkg["sqlalchemy.ext.asyncio"] = importSpec{Module: "sqlalchemy.ext.asyncio"}
 	}
 
@@ -154,10 +154,12 @@ func (i *importer) queryImportSpecs(fileName string) (map[string]importSpec, map
 			std["typing.Optional"] = importSpec{Module: "typing", Name: "Optional"}
 		}
 		if q.Cmd == ":many" {
-			if i.C.EmitGenerators {
-				if i.C.EmitAsync {
+			// NOTE: We are adding backwards compatible behavior
+			if i.C.EmitGenerators || i.C.EmitSyncQuerier || i.C.EmitAsyncQuerier {
+				if i.C.EmitAsync || i.C.EmitAsyncQuerier {
 					std["typing.AsyncIterator"] = importSpec{Module: "typing", Name: "AsyncIterator"}
-				} else {
+				}
+				if !i.C.EmitAsync || i.C.EmitSyncQuerier {
 					std["typing.Iterator"] = importSpec{Module: "typing", Name: "Iterator"}
 				}
 			} else {

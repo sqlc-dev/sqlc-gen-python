@@ -4,7 +4,7 @@ package python
 type Config struct {
 	EmitAsync                   bool     `json:"emit_async"` // Emits async code instead of sync
 	EmitExactTableNames         bool     `json:"emit_exact_table_names"`
-	EmitGenerators              bool     `json:"emit_generators"` // Will we use generators or lists, defaults to true
+	EmitGenerators              bool     `json:"emit_generators"` // Will we use generators or lists, defaults to false
 	EmitModule                  bool     `json:"emit_module"`     // If true emits functions in module, else wraps in a class.
 	EmitPydanticModels          bool     `json:"emit_pydantic_models"`
 	EmitSyncQuerier             bool     `json:"emit_sync_querier"`  // DEPRECATED ALIAS FOR: emit_type = 'class', emit_generators = True

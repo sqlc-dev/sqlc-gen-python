@@ -845,7 +845,7 @@ func querierClassDef(name string, connectionAnnotation *pyast.Node) *pyast.Class
 									Arg: "self",
 								},
 								{
-									Arg:        "connection",
+									Arg:        "conn",
 									Annotation: connectionAnnotation,
 								},
 							},
@@ -855,9 +855,9 @@ func querierClassDef(name string, connectionAnnotation *pyast.Node) *pyast.Class
 								Node: &pyast.Node_Assign{
 									Assign: &pyast.Assign{
 										Targets: []*pyast.Node{
-											poet.Attribute(poet.Name("self"), "_connection"),
+											poet.Attribute(poet.Name("self"), "_conn"),
 										},
-										Value: poet.Name("connection"),
+										Value: poet.Name("conn"),
 									},
 								},
 							},
@@ -869,80 +869,12 @@ func querierClassDef(name string, connectionAnnotation *pyast.Node) *pyast.Class
 	}
 }
 
-func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
-	mod := moduleNode(ctx.SqlcVersion, source)
-	std, pkg := i.queryImportSpecs(source)
-	mod.Body = append(mod.Body, buildImportGroup(std), buildImportGroup(pkg))
-	mod.Body = append(mod.Body, &pyast.Node{
-		Node: &pyast.Node_ImportGroup{
-			ImportGroup: &pyast.ImportGroup{
-				Imports: []*pyast.Node{
-					{
-						Node: &pyast.Node_ImportFrom{
-							ImportFrom: &pyast.ImportFrom{
-								Module: ctx.C.Package,
-								Names: []*pyast.Node{
-									poet.Alias("models"),
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-
-	for _, q := range ctx.Queries {
-		if !ctx.OutputQuery(q.SourceName) {
-			continue
-		}
-		queryText := fmt.Sprintf("-- name: %s \\\\%s\n%s\n", q.MethodName, q.Cmd, q.SQL)
-		mod.Body = append(mod.Body, assignNode(q.ConstantName, poet.Constant(queryText)))
-
-		// Generate params structures
-		for _, arg := range q.Args {
-			if arg.EmitStruct() {
-				var def *pyast.ClassDef
-				if ctx.C.EmitPydanticModels {
-					def = pydanticNode(arg.Struct.Name)
-				} else {
-					def = dataclassNode(arg.Struct.Name)
-				}
-
-				// We need a copy as we want to make sure that nullable params are at the end of the dataclass
-				fields := make([]Field, len(arg.Struct.Fields))
-				copy(fields, arg.Struct.Fields)
-
-				// Place all nullable fields at the end and try to keep the original order as much as possible
-				sort.SliceStable(fields, func(i int, j int) bool {
-					return (fields[j].Type.IsNull && fields[i].Type.IsNull != fields[j].Type.IsNull) || i < j
-				})
-
-				for _, f := range fields {
-					def.Body = append(def.Body, fieldNode(f, true))
-				}
-				mod.Body = append(mod.Body, poet.Node(def))
-			}
-		}
-		if q.Ret.EmitStruct() {
-			var def *pyast.ClassDef
-			if ctx.C.EmitPydanticModels {
-				def = pydanticNode(q.Ret.Struct.Name)
-			} else {
-				def = dataclassNode(q.Ret.Struct.Name)
-			}
-			for _, f := range q.Ret.Struct.Fields {
-				def.Body = append(def.Body, fieldNode(f, false))
-			}
-			mod.Body = append(mod.Body, poet.Node(def))
-		}
-	}
-
+func buildQuerierClass(ctx *pyTmplCtx, isAsync bool) []*pyast.Node {
 	functions := make([]*pyast.Node, 0, 10)
 
 	// Define some reused types based on async or sync code
 	var connectionAnnotation *pyast.Node
-	if ctx.C.EmitAsync {
+	if isAsync {
 		connectionAnnotation = typeRefNode("sqlalchemy", "ext", "asyncio", "AsyncConnection")
 	} else {
 		connectionAnnotation = typeRefNode("sqlalchemy", "engine", "Connection")
@@ -951,9 +883,9 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 	// We need to figure out how to access the SQLAlchemy connectionVar object
 	var connectionVar *pyast.Node
 	if ctx.C.EmitModule {
-		connectionVar = poet.Name("connection")
+		connectionVar = poet.Name("conn")
 	} else {
-		connectionVar = poet.Attribute(poet.Name("self"), "_connection")
+		connectionVar = poet.Attribute(poet.Name("self"), "_conn")
 	}
 
 	// We loop through all queries and build our query functions
@@ -968,7 +900,7 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 
 		if ctx.C.EmitModule {
 			f.Args.Args = append(f.Args.Args, &pyast.Arg{
-				Arg:        "connection",
+				Arg:        "conn",
 				Annotation: connectionAnnotation,
 			})
 		} else {
@@ -980,7 +912,7 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 		q.AddArgs(f.Args)
 
 		exec := poet.Expr(connMethodNode(poet.Attribute(connectionVar, "execute"), q.ConstantName, q.ArgDictNode()))
-		if ctx.C.EmitAsync {
+		if isAsync {
 			exec = poet.Await(exec)
 		}
 
@@ -1017,7 +949,7 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 			f.Returns = subscriptNode("Optional", q.Ret.Annotation())
 		case ":many":
 			if ctx.C.EmitGenerators {
-				if ctx.C.EmitAsync {
+				if isAsync {
 					// If we are using generators and async, we are switching to stream implementation
 					exec = poet.Await(connMethodNode(poet.Attribute(connectionVar, "stream"), q.ConstantName, q.ArgDictNode()))
 
@@ -1094,8 +1026,8 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 			panic("unknown cmd " + q.Cmd)
 		}
 
-		// If we are emitting async code, we have to swap our sync func for an async one and fix the connection annotation.
-		if ctx.C.EmitAsync {
+		// If we are emitting async code, we have to swap our sync func for an async one and fix the conn annotation.
+		if isAsync {
 			functions = append(functions, poet.Node(&pyast.AsyncFunctionDef{
 				Name:    f.Name,
 				Args:    f.Args,
@@ -1107,13 +1039,115 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 		}
 	}
 
-	// Lets see how to add all functions
+	return functions
+}
+
+func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
+	mod := moduleNode(ctx.SqlcVersion, source)
+	std, pkg := i.queryImportSpecs(source)
+	mod.Body = append(mod.Body, buildImportGroup(std), buildImportGroup(pkg))
+	mod.Body = append(mod.Body, &pyast.Node{
+		Node: &pyast.Node_ImportGroup{
+			ImportGroup: &pyast.ImportGroup{
+				Imports: []*pyast.Node{
+					{
+						Node: &pyast.Node_ImportFrom{
+							ImportFrom: &pyast.ImportFrom{
+								Module: ctx.C.Package,
+								Names: []*pyast.Node{
+									poet.Alias("models"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	for _, q := range ctx.Queries {
+		if !ctx.OutputQuery(q.SourceName) {
+			continue
+		}
+		queryText := fmt.Sprintf("-- name: %s \\\\%s\n%s\n", q.MethodName, q.Cmd, q.SQL)
+		mod.Body = append(mod.Body, assignNode(q.ConstantName, poet.Constant(queryText)))
+
+		// Generate params structures
+		for _, arg := range q.Args {
+			if arg.EmitStruct() {
+				var def *pyast.ClassDef
+				if ctx.C.EmitPydanticModels {
+					def = pydanticNode(arg.Struct.Name)
+				} else {
+					def = dataclassNode(arg.Struct.Name)
+				}
+
+				// We need a copy as we want to make sure that nullable params are at the end of the dataclass
+				fields := make([]Field, len(arg.Struct.Fields))
+				copy(fields, arg.Struct.Fields)
+
+				// Place all nullable fields at the end and try to keep the original order as much as possible
+				sort.SliceStable(fields, func(i int, j int) bool {
+					return (fields[j].Type.IsNull && fields[i].Type.IsNull != fields[j].Type.IsNull) || i < j
+				})
+
+				for _, f := range fields {
+					def.Body = append(def.Body, fieldNode(f, true))
+				}
+				mod.Body = append(mod.Body, poet.Node(def))
+			}
+		}
+		if q.Ret.EmitStruct() {
+			var def *pyast.ClassDef
+			if ctx.C.EmitPydanticModels {
+				def = pydanticNode(q.Ret.Struct.Name)
+			} else {
+				def = dataclassNode(q.Ret.Struct.Name)
+			}
+			for _, f := range q.Ret.Struct.Fields {
+				def.Body = append(def.Body, fieldNode(f, false))
+			}
+			mod.Body = append(mod.Body, poet.Node(def))
+		}
+	}
+
+	// Lets see how to add all functions, we can either add them to the module directly or from within a class.
 	if ctx.C.EmitModule {
-		mod.Body = append(mod.Body, functions...)
+		mod.Body = append(mod.Body, buildQuerierClass(ctx, ctx.C.EmitAsync)...)
 	} else {
-		cls := querierClassDef("Querier", connectionAnnotation)
-		cls.Body = append(cls.Body, functions...)
-		mod.Body = append(mod.Body, poet.Node(cls))
+		asyncConnectionAnnotation := typeRefNode("sqlalchemy", "ext", "asyncio", "AsyncConnection")
+		syncConnectionAnnotation := typeRefNode("sqlalchemy", "engine", "Connection")
+
+		// NOTE: For backwards compatibility we support generating multiple classes, but this is definitely suboptimal.
+		// It is much better to use the `emit_async: bool` config to select what type to emit
+		if ctx.C.EmitAsyncQuerier || ctx.C.EmitSyncQuerier {
+
+			// When using these backwards compatible settings we force behavior!
+			ctx.C.EmitModule = false
+			ctx.C.EmitGenerators = true
+
+			if ctx.C.EmitSyncQuerier {
+				cls := querierClassDef("Querier", syncConnectionAnnotation)
+				cls.Body = append(cls.Body, buildQuerierClass(ctx, false)...)
+				mod.Body = append(mod.Body, poet.Node(cls))
+			}
+			if ctx.C.EmitAsyncQuerier {
+				cls := querierClassDef("AsyncQuerier", asyncConnectionAnnotation)
+				cls.Body = append(cls.Body, buildQuerierClass(ctx, true)...)
+				mod.Body = append(mod.Body, poet.Node(cls))
+			}
+		} else {
+			var connectionAnnotation *pyast.Node
+			if ctx.C.EmitAsync {
+				connectionAnnotation = asyncConnectionAnnotation
+			} else {
+				connectionAnnotation = syncConnectionAnnotation
+			}
+
+			cls := querierClassDef("Querier", connectionAnnotation)
+			cls.Body = append(cls.Body, buildQuerierClass(ctx, ctx.C.EmitAsync)...)
+			mod.Body = append(mod.Body, poet.Node(cls))
+		}
 	}
 
 	return poet.Node(mod)
@@ -1148,14 +1182,6 @@ func Generate(_ context.Context, req *plugin.GenerateRequest) (*plugin.GenerateR
 		if err := json.Unmarshal(req.PluginOptions, &conf); err != nil {
 			return nil, err
 		}
-	}
-
-	// TODO: Remove when when we drop support for deprecated EmitSyncQuerier and EmitAsyncQuerier options
-	if conf.EmitAsyncQuerier || conf.EmitSyncQuerier {
-		conf.EmitModule = false
-		conf.EmitGenerators = true
-		conf.EmitAsync = conf.EmitAsyncQuerier
-		// TODO/NOTE: We now have a breaking change because we emit only one flavor. What do we want to do?
 	}
 
 	enums := buildEnums(req)

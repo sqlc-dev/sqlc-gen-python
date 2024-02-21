@@ -1,5 +1,4 @@
 bin
-*.wasm
 
 # Devenv
 .envrc
