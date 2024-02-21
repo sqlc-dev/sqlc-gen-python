@@ -686,7 +686,6 @@ func pydanticNode(name string) *pyast.ClassDef {
 }
 
 func fieldNode(f Field, defaultNone bool) *pyast.Node {
-	// TODO: Current AST is showing limitation as annotated assign does not support a value :'(, manually edited :'(
 	var value *pyast.Node = nil
 	if defaultNone && f.Type.IsNull {
 		value = &pyast.Node{
