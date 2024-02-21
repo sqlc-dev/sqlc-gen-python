@@ -1,0 +1,10 @@
+version: v1
+name: github.com/sqlc-dev/sqlc-gen-python
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - DEFAULT
+  except:
+    - PACKAGE_VERSION_SUFFIX
