@@ -53,6 +53,8 @@ type Field struct {
 	Name    string
 	Type    pyType
 	Comment string
+	// EmbedFields contains the embedded fields that require scanning.
+	EmbedFields []Field
 }
 
 type Struct struct {
@@ -105,14 +107,42 @@ func (v QueryValue) RowNode(rowVar string) *pyast.Node {
 	call := &pyast.Call{
 		Func: v.Annotation(),
 	}
-	for i, f := range v.Struct.Fields {
-		call.Keywords = append(call.Keywords, &pyast.Keyword{
-			Arg: f.Name,
-			Value: subscriptNode(
+	rowIndex := 0 // We need to keep track of the index in the row variable.
+	for _, f := range v.Struct.Fields {
+
+		var valueNode *pyast.Node
+		// Check if we are using sqlc.embed, if so we need to create a new object.
+		if len(f.EmbedFields) > 0 {
+			// We keep this separate so we can easily add all arguments.
+			embed_call := &pyast.Call{Func: f.Type.Annotation()}
+
+			// Now add all field Initializers for the embedded model that index into the original row.
+			for i, embedField := range f.EmbedFields {
+				embed_call.Keywords = append(embed_call.Keywords, &pyast.Keyword{
+					Arg: embedField.Name,
+					Value: subscriptNode(
+						rowVar,
+						constantInt(rowIndex+i),
+					),
+				})
+			}
+
+			valueNode = &pyast.Node{
+				Node: &pyast.Node_Call{
+					Call: embed_call,
+				},
+			}
+
+			rowIndex += len(f.EmbedFields)
+		} else {
+			valueNode = subscriptNode(
 				rowVar,
-				constantInt(i),
-			),
-		})
+				constantInt(rowIndex),
+			)
+			rowIndex++
+		}
+
+		call.Keywords = append(call.Keywords, &pyast.Keyword{Arg: f.Name, Value: valueNode})
 	}
 	return &pyast.Node{
 		Node: &pyast.Node_Call{
@@ -319,6 +349,47 @@ func paramName(p *plugin.Parameter) string {
 type pyColumn struct {
 	id int32
 	*plugin.Column
+	embed *pyEmbed
+}
+
+type pyEmbed struct {
+	modelType string
+	modelName string
+	fields    []Field
+}
+
+// Taken from https://github.com/sqlc-dev/sqlc/blob/8c59fbb9938a0bad3d9971fc2c10ea1f83cc1d0b/internal/codegen/golang/result.go#L123-L126
+// look through all the structs and attempt to find a matching one to embed
+// We need the name of the struct and its field names.
+func newGoEmbed(embed *plugin.Identifier, structs []Struct, defaultSchema string) *pyEmbed {
+	if embed == nil {
+		return nil
+	}
+
+	for _, s := range structs {
+		embedSchema := defaultSchema
+		if embed.Schema != "" {
+			embedSchema = embed.Schema
+		}
+
+		// compare the other attributes
+		if embed.Catalog != s.Table.Catalog || embed.Name != s.Table.Name || embedSchema != s.Table.Schema {
+			continue
+		}
+
+		fields := make([]Field, len(s.Fields))
+		for i, f := range s.Fields {
+			fields[i] = f
+		}
+
+		return &pyEmbed{
+			modelType: s.Name,
+			modelName: s.Name,
+			fields:    fields,
+		}
+	}
+
+	return nil
 }
 
 func columnsToStruct(req *plugin.GenerateRequest, name string, columns []pyColumn) *Struct {
@@ -342,10 +413,22 @@ func columnsToStruct(req *plugin.GenerateRequest, name string, columns []pyColum
 		if suffix > 0 {
 			fieldName = fmt.Sprintf("%s_%d", fieldName, suffix)
 		}
-		gs.Fields = append(gs.Fields, Field{
+
+		f := Field{
 			Name: fieldName,
 			Type: makePyType(req, c.Column),
-		})
+		}
+
+		if c.embed != nil {
+			f.Type = pyType{
+				InnerType: "models." + modelName(c.embed.modelType, req.Settings),
+				IsArray:   false,
+				IsNull:    false,
+			}
+			f.EmbedFields = c.embed.fields
+		}
+
+		gs.Fields = append(gs.Fields, f)
 		seen[colName]++
 	}
 	return &gs
@@ -459,6 +542,7 @@ func buildQueries(conf Config, req *plugin.GenerateRequest, structs []Struct) ([
 					columns = append(columns, pyColumn{
 						id:     int32(i),
 						Column: c,
+						embed:  newGoEmbed(c.EmbedTable, structs, req.Catalog.DefaultSchema),
 					})
 				}
 				gs = columnsToStruct(req, query.Name+"Row", columns)
@@ -601,12 +685,22 @@ func pydanticNode(name string) *pyast.ClassDef {
 	}
 }
 
-func fieldNode(f Field) *pyast.Node {
+func fieldNode(f Field, defaultNone bool) *pyast.Node {
+	var value *pyast.Node = nil
+	if defaultNone && f.Type.IsNull {
+		value = &pyast.Node{
+			Node: &pyast.Node_Name{
+				Name: &pyast.Name{Id: "None"},
+			},
+		}
+	}
+
 	return &pyast.Node{
 		Node: &pyast.Node_AnnAssign{
 			AnnAssign: &pyast.AnnAssign{
 				Target:     &pyast.Name{Id: f.Name},
 				Annotation: f.Type.Annotation(),
+				Value:      value,
 				Comment:    f.Comment,
 			},
 		},
@@ -621,7 +715,7 @@ func typeRefNode(base string, parts ...string) *pyast.Node {
 	return n
 }
 
-func connMethodNode(method, name string, arg *pyast.Node) *pyast.Node {
+func connMethodNode(method *pyast.Node, name string, arg *pyast.Node) *pyast.Node {
 	args := []*pyast.Node{
 		{
 			Node: &pyast.Node_Call{
@@ -640,7 +734,7 @@ func connMethodNode(method, name string, arg *pyast.Node) *pyast.Node {
 	return &pyast.Node{
 		Node: &pyast.Node_Call{
 			Call: &pyast.Call{
-				Func: typeRefNode("self", "_conn", method),
+				Func: method,
 				Args: args,
 			},
 		},
@@ -724,7 +818,7 @@ func buildModelsTree(ctx *pyTmplCtx, i *importer) *pyast.Node {
 			})
 		}
 		for _, f := range m.Fields {
-			def.Body = append(def.Body, fieldNode(f))
+			def.Body = append(def.Body, fieldNode(f, false))
 		}
 		mod.Body = append(mod.Body, &pyast.Node{
 			Node: &pyast.Node_ClassDef{
@@ -736,9 +830,9 @@ func buildModelsTree(ctx *pyTmplCtx, i *importer) *pyast.Node {
 	return &pyast.Node{Node: &pyast.Node_Module{Module: mod}}
 }
 
-func querierClassDef() *pyast.ClassDef {
+func querierClassDef(name string, connectionAnnotation *pyast.Node) *pyast.ClassDef {
 	return &pyast.ClassDef{
-		Name: "Querier",
+		Name: name,
 		Body: []*pyast.Node{
 			{
 				Node: &pyast.Node_FunctionDef{
@@ -751,7 +845,7 @@ func querierClassDef() *pyast.ClassDef {
 								},
 								{
 									Arg:        "conn",
-									Annotation: typeRefNode("sqlalchemy", "engine", "Connection"),
+									Annotation: connectionAnnotation,
 								},
 							},
 						},
@@ -774,42 +868,177 @@ func querierClassDef() *pyast.ClassDef {
 	}
 }
 
-func asyncQuerierClassDef() *pyast.ClassDef {
-	return &pyast.ClassDef{
-		Name: "AsyncQuerier",
-		Body: []*pyast.Node{
-			{
-				Node: &pyast.Node_FunctionDef{
-					FunctionDef: &pyast.FunctionDef{
-						Name: "__init__",
-						Args: &pyast.Arguments{
-							Args: []*pyast.Arg{
-								{
-									Arg: "self",
+func buildQuerierClass(ctx *pyTmplCtx, isAsync bool) []*pyast.Node {
+	functions := make([]*pyast.Node, 0, 10)
+
+	// Define some reused types based on async or sync code
+	var connectionAnnotation *pyast.Node
+	if isAsync {
+		connectionAnnotation = typeRefNode("sqlalchemy", "ext", "asyncio", "AsyncConnection")
+	} else {
+		connectionAnnotation = typeRefNode("sqlalchemy", "engine", "Connection")
+	}
+
+	// We need to figure out how to access the SQLAlchemy connectionVar object
+	var connectionVar *pyast.Node
+	if ctx.C.EmitModule {
+		connectionVar = poet.Name("conn")
+	} else {
+		connectionVar = poet.Attribute(poet.Name("self"), "_conn")
+	}
+
+	// We loop through all queries and build our query functions
+	for _, q := range ctx.Queries {
+		if !ctx.OutputQuery(q.SourceName) {
+			continue
+		}
+		f := &pyast.FunctionDef{
+			Name: q.MethodName,
+			Args: &pyast.Arguments{},
+		}
+
+		if ctx.C.EmitModule {
+			f.Args.Args = append(f.Args.Args, &pyast.Arg{
+				Arg:        "conn",
+				Annotation: connectionAnnotation,
+			})
+		} else {
+			f.Args.Args = append(f.Args.Args, &pyast.Arg{
+				Arg: "self",
+			})
+		}
+
+		q.AddArgs(f.Args)
+
+		exec := poet.Expr(connMethodNode(poet.Attribute(connectionVar, "execute"), q.ConstantName, q.ArgDictNode()))
+		if isAsync {
+			exec = poet.Await(exec)
+		}
+
+		switch q.Cmd {
+		case ":one":
+			f.Body = append(f.Body,
+				assignNode("row", poet.Node(
+					&pyast.Call{
+						Func: poet.Attribute(exec, "first"),
+					},
+				)),
+				poet.Node(
+					&pyast.If{
+						Test: poet.Node(
+							&pyast.Compare{
+								Left: poet.Name("row"),
+								Ops: []*pyast.Node{
+									poet.Is(),
 								},
-								{
-									Arg:        "conn",
-									Annotation: typeRefNode("sqlalchemy", "ext", "asyncio", "AsyncConnection"),
+								Comparators: []*pyast.Node{
+									poet.Constant(nil),
 								},
 							},
-						},
+						),
 						Body: []*pyast.Node{
-							{
-								Node: &pyast.Node_Assign{
-									Assign: &pyast.Assign{
-										Targets: []*pyast.Node{
-											poet.Attribute(poet.Name("self"), "_conn"),
-										},
-										Value: poet.Name("conn"),
-									},
-								},
-							},
+							poet.Return(
+								poet.Constant(nil),
+							),
 						},
 					},
-				},
-			},
-		},
+				),
+				poet.Return(q.Ret.RowNode("row")),
+			)
+			f.Returns = subscriptNode("Optional", q.Ret.Annotation())
+		case ":many":
+			if ctx.C.EmitGenerators {
+				if isAsync {
+					// If we are using generators and async, we are switching to stream implementation
+					exec = poet.Await(connMethodNode(poet.Attribute(connectionVar, "stream"), q.ConstantName, q.ArgDictNode()))
+
+					f.Returns = subscriptNode("AsyncIterator", q.Ret.Annotation())
+					f.Body = append(f.Body,
+						assignNode("result", exec),
+						poet.Node(
+							&pyast.AsyncFor{
+								Target: poet.Name("row"),
+								Iter:   poet.Name("result"),
+								Body: []*pyast.Node{
+									poet.Expr(
+										poet.Yield(
+											q.Ret.RowNode("row"),
+										),
+									),
+								},
+							},
+						))
+				} else {
+					f.Returns = subscriptNode("Iterator", q.Ret.Annotation())
+					f.Body = append(f.Body,
+						assignNode("result", exec),
+						poet.Node(
+							&pyast.For{
+								Target: poet.Name("row"),
+								Iter:   poet.Name("result"),
+								Body: []*pyast.Node{
+									poet.Expr(
+										poet.Yield(
+											q.Ret.RowNode("row"),
+										),
+									),
+								},
+							},
+						))
+				}
+			} else {
+				f.Body = append(f.Body,
+					assignNode("result", poet.Node(
+						&pyast.Call{
+							Func: poet.Attribute(exec, "all"),
+						},
+					)),
+					poet.Node(&pyast.Return{
+						Value: poet.Node(
+							&pyast.For{
+								Target: poet.Name("row"),
+								Iter:   poet.Name("result"),
+								Body: []*pyast.Node{
+									q.Ret.RowNode("row"),
+								},
+							},
+						),
+					},
+					))
+				f.Returns = subscriptNode("List", q.Ret.Annotation())
+			}
+		case ":exec":
+			f.Body = append(f.Body, exec)
+			f.Returns = poet.Constant(nil)
+		case ":execrows":
+			f.Body = append(f.Body,
+				assignNode("result", exec),
+				poet.Return(poet.Attribute(poet.Name("result"), "rowcount")),
+			)
+			f.Returns = poet.Name("int")
+		case ":execresult":
+			f.Body = append(f.Body,
+				poet.Return(exec),
+			)
+			f.Returns = typeRefNode("sqlalchemy", "engine", "Result")
+		default:
+			panic("unknown cmd " + q.Cmd)
+		}
+
+		// If we are emitting async code, we have to swap our sync func for an async one and fix the conn annotation.
+		if isAsync {
+			functions = append(functions, poet.Node(&pyast.AsyncFunctionDef{
+				Name:    f.Name,
+				Args:    f.Args,
+				Body:    f.Body,
+				Returns: f.Returns,
+			}))
+		} else {
+			functions = append(functions, poet.Node(f))
+		}
 	}
+
+	return functions
 }
 
 func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
@@ -841,6 +1070,8 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 		}
 		queryText := fmt.Sprintf("-- name: %s \\\\%s\n%s\n", q.MethodName, q.Cmd, q.SQL)
 		mod.Body = append(mod.Body, assignNode(q.ConstantName, poet.Constant(queryText)))
+
+		// Generate params structures
 		for _, arg := range q.Args {
 			if arg.EmitStruct() {
 				var def *pyast.ClassDef
@@ -849,8 +1080,18 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 				} else {
 					def = dataclassNode(arg.Struct.Name)
 				}
-				for _, f := range arg.Struct.Fields {
-					def.Body = append(def.Body, fieldNode(f))
+
+				// We need a copy as we want to make sure that nullable params are at the end of the dataclass
+				fields := make([]Field, len(arg.Struct.Fields))
+				copy(fields, arg.Struct.Fields)
+
+				// Place all nullable fields at the end and try to keep the original order as much as possible
+				sort.SliceStable(fields, func(i int, j int) bool {
+					return (fields[j].Type.IsNull && fields[i].Type.IsNull != fields[j].Type.IsNull) || i < j
+				})
+
+				for _, f := range fields {
+					def.Body = append(def.Body, fieldNode(f, true))
 				}
 				mod.Body = append(mod.Body, poet.Node(def))
 			}
@@ -863,195 +1104,49 @@ func buildQueryTree(ctx *pyTmplCtx, i *importer, source string) *pyast.Node {
 				def = dataclassNode(q.Ret.Struct.Name)
 			}
 			for _, f := range q.Ret.Struct.Fields {
-				def.Body = append(def.Body, fieldNode(f))
+				def.Body = append(def.Body, fieldNode(f, false))
 			}
 			mod.Body = append(mod.Body, poet.Node(def))
 		}
 	}
 
-	if ctx.C.EmitSyncQuerier {
-		cls := querierClassDef()
-		for _, q := range ctx.Queries {
-			if !ctx.OutputQuery(q.SourceName) {
-				continue
-			}
-			f := &pyast.FunctionDef{
-				Name: q.MethodName,
-				Args: &pyast.Arguments{
-					Args: []*pyast.Arg{
-						{
-							Arg: "self",
-						},
-					},
-				},
-			}
+	// Lets see how to add all functions, we can either add them to the module directly or from within a class.
+	if ctx.C.EmitModule {
+		mod.Body = append(mod.Body, buildQuerierClass(ctx, ctx.C.EmitAsync)...)
+	} else {
+		asyncConnectionAnnotation := typeRefNode("sqlalchemy", "ext", "asyncio", "AsyncConnection")
+		syncConnectionAnnotation := typeRefNode("sqlalchemy", "engine", "Connection")
 
-			q.AddArgs(f.Args)
-			exec := connMethodNode("execute", q.ConstantName, q.ArgDictNode())
+		// NOTE: For backwards compatibility we support generating multiple classes, but this is definitely suboptimal.
+		// It is much better to use the `emit_async: bool` config to select what type to emit
+		if ctx.C.EmitAsyncQuerier || ctx.C.EmitSyncQuerier {
 
-			switch q.Cmd {
-			case ":one":
-				f.Body = append(f.Body,
-					assignNode("row", poet.Node(
-						&pyast.Call{
-							Func: poet.Attribute(exec, "first"),
-						},
-					)),
-					poet.Node(
-						&pyast.If{
-							Test: poet.Node(
-								&pyast.Compare{
-									Left: poet.Name("row"),
-									Ops: []*pyast.Node{
-										poet.Is(),
-									},
-									Comparators: []*pyast.Node{
-										poet.Constant(nil),
-									},
-								},
-							),
-							Body: []*pyast.Node{
-								poet.Return(
-									poet.Constant(nil),
-								),
-							},
-						},
-					),
-					poet.Return(q.Ret.RowNode("row")),
-				)
-				f.Returns = subscriptNode("Optional", q.Ret.Annotation())
-			case ":many":
-				f.Body = append(f.Body,
-					assignNode("result", exec),
-					poet.Node(
-						&pyast.For{
-							Target: poet.Name("row"),
-							Iter:   poet.Name("result"),
-							Body: []*pyast.Node{
-								poet.Expr(
-									poet.Yield(
-										q.Ret.RowNode("row"),
-									),
-								),
-							},
-						},
-					),
-				)
-				f.Returns = subscriptNode("Iterator", q.Ret.Annotation())
-			case ":exec":
-				f.Body = append(f.Body, exec)
-				f.Returns = poet.Constant(nil)
-			case ":execrows":
-				f.Body = append(f.Body,
-					assignNode("result", exec),
-					poet.Return(poet.Attribute(poet.Name("result"), "rowcount")),
-				)
-				f.Returns = poet.Name("int")
-			case ":execresult":
-				f.Body = append(f.Body,
-					poet.Return(exec),
-				)
-				f.Returns = typeRefNode("sqlalchemy", "engine", "Result")
-			default:
-				panic("unknown cmd " + q.Cmd)
+			// When using these backwards compatible settings we force behavior!
+			ctx.C.EmitModule = false
+			ctx.C.EmitGenerators = true
+
+			if ctx.C.EmitSyncQuerier {
+				cls := querierClassDef("Querier", syncConnectionAnnotation)
+				cls.Body = append(cls.Body, buildQuerierClass(ctx, false)...)
+				mod.Body = append(mod.Body, poet.Node(cls))
+			}
+			if ctx.C.EmitAsyncQuerier {
+				cls := querierClassDef("AsyncQuerier", asyncConnectionAnnotation)
+				cls.Body = append(cls.Body, buildQuerierClass(ctx, true)...)
+				mod.Body = append(mod.Body, poet.Node(cls))
+			}
+		} else {
+			var connectionAnnotation *pyast.Node
+			if ctx.C.EmitAsync {
+				connectionAnnotation = asyncConnectionAnnotation
+			} else {
+				connectionAnnotation = syncConnectionAnnotation
 			}
 
-			cls.Body = append(cls.Body, poet.Node(f))
+			cls := querierClassDef("Querier", connectionAnnotation)
+			cls.Body = append(cls.Body, buildQuerierClass(ctx, ctx.C.EmitAsync)...)
+			mod.Body = append(mod.Body, poet.Node(cls))
 		}
-		mod.Body = append(mod.Body, poet.Node(cls))
-	}
-
-	if ctx.C.EmitAsyncQuerier {
-		cls := asyncQuerierClassDef()
-		for _, q := range ctx.Queries {
-			if !ctx.OutputQuery(q.SourceName) {
-				continue
-			}
-			f := &pyast.AsyncFunctionDef{
-				Name: q.MethodName,
-				Args: &pyast.Arguments{
-					Args: []*pyast.Arg{
-						{
-							Arg: "self",
-						},
-					},
-				},
-			}
-
-			q.AddArgs(f.Args)
-			exec := connMethodNode("execute", q.ConstantName, q.ArgDictNode())
-
-			switch q.Cmd {
-			case ":one":
-				f.Body = append(f.Body,
-					assignNode("row", poet.Node(
-						&pyast.Call{
-							Func: poet.Attribute(poet.Await(exec), "first"),
-						},
-					)),
-					poet.Node(
-						&pyast.If{
-							Test: poet.Node(
-								&pyast.Compare{
-									Left: poet.Name("row"),
-									Ops: []*pyast.Node{
-										poet.Is(),
-									},
-									Comparators: []*pyast.Node{
-										poet.Constant(nil),
-									},
-								},
-							),
-							Body: []*pyast.Node{
-								poet.Return(
-									poet.Constant(nil),
-								),
-							},
-						},
-					),
-					poet.Return(q.Ret.RowNode("row")),
-				)
-				f.Returns = subscriptNode("Optional", q.Ret.Annotation())
-			case ":many":
-				stream := connMethodNode("stream", q.ConstantName, q.ArgDictNode())
-				f.Body = append(f.Body,
-					assignNode("result", poet.Await(stream)),
-					poet.Node(
-						&pyast.AsyncFor{
-							Target: poet.Name("row"),
-							Iter:   poet.Name("result"),
-							Body: []*pyast.Node{
-								poet.Expr(
-									poet.Yield(
-										q.Ret.RowNode("row"),
-									),
-								),
-							},
-						},
-					),
-				)
-				f.Returns = subscriptNode("AsyncIterator", q.Ret.Annotation())
-			case ":exec":
-				f.Body = append(f.Body, poet.Await(exec))
-				f.Returns = poet.Constant(nil)
-			case ":execrows":
-				f.Body = append(f.Body,
-					assignNode("result", poet.Await(exec)),
-					poet.Return(poet.Attribute(poet.Name("result"), "rowcount")),
-				)
-				f.Returns = poet.Name("int")
-			case ":execresult":
-				f.Body = append(f.Body,
-					poet.Return(poet.Await(exec)),
-				)
-				f.Returns = typeRefNode("sqlalchemy", "engine", "Result")
-			default:
-				panic("unknown cmd " + q.Cmd)
-			}
-
-			cls.Body = append(cls.Body, poet.Node(f))
-		}
-		mod.Body = append(mod.Body, poet.Node(cls))
 	}
 
 	return poet.Node(mod)
@@ -1075,7 +1170,13 @@ func HashComment(s string) string {
 }
 
 func Generate(_ context.Context, req *plugin.GenerateRequest) (*plugin.GenerateResponse, error) {
-	var conf Config
+	// Setup our defaults for our Config struct and parse our config file
+	defaultModelsFileName := "models.py"
+	conf := Config{
+		OutputModelsFileName: &defaultModelsFileName,
+		OutputQuerierFile:    true,
+	}
+
 	if len(req.PluginOptions) > 0 {
 		if err := json.Unmarshal(req.PluginOptions, &conf); err != nil {
 			return nil, err
@@ -1105,26 +1206,34 @@ func Generate(_ context.Context, req *plugin.GenerateRequest) (*plugin.GenerateR
 	}
 
 	output := map[string]string{}
-	result := pyprint.Print(buildModelsTree(&tctx, i), pyprint.Options{})
-	tctx.SourceName = "models.py"
-	output["models.py"] = string(result.Python)
 
-	files := map[string]struct{}{}
-	for _, q := range queries {
-		files[q.SourceName] = struct{}{}
+	// Generate the model file.
+	if conf.OutputModelsFileName != nil {
+		result := pyprint.Print(buildModelsTree(&tctx, i), pyprint.Options{})
+		tctx.SourceName = *conf.OutputModelsFileName
+		output[*conf.OutputModelsFileName] = string(result.Python)
 	}
 
-	for source := range files {
-		tctx.SourceName = source
-		result := pyprint.Print(buildQueryTree(&tctx, i, source), pyprint.Options{})
-		name := source
-		if !strings.HasSuffix(name, ".py") {
-			name = strings.TrimSuffix(name, ".sql")
-			name += ".py"
+	// Generate for each .sql file a corresponding Python query file.
+	if conf.OutputQuerierFile {
+		files := map[string]struct{}{}
+		for _, q := range queries {
+			files[q.SourceName] = struct{}{}
 		}
-		output[name] = string(result.Python)
+
+		for source := range files {
+			tctx.SourceName = source
+			result := pyprint.Print(buildQueryTree(&tctx, i, source), pyprint.Options{})
+			name := source
+			if !strings.HasSuffix(name, ".py") {
+				name = strings.TrimSuffix(name, ".sql")
+				name += ".py"
+			}
+			output[name] = string(result.Python)
+		}
 	}
 
+	// Finally we send our outputs back to SQLC
 	resp := plugin.GenerateResponse{}
 
 	for filename, code := range output {
