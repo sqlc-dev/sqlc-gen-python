@@ -222,6 +222,9 @@ func pyEnumValueName(value string) string {
 	id := strings.Replace(value, "-", "_", -1)
 	id = strings.Replace(id, ":", "_", -1)
 	id = strings.Replace(id, "/", "_", -1)
+	id = strings.Replace(id, ">", "GT", -1)
+	id = strings.Replace(id, "<", "LT", -1)
+	id = strings.Replace(id, "=", "EQ", -1)
 	id = pyIdentPattern.ReplaceAllString(id, "")
 	return strings.ToUpper(id)
 }
