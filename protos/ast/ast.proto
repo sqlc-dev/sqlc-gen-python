@@ -59,8 +59,9 @@ message AnnAssign
 {
   Name target = 1 [json_name="target"];
   Node annotation = 2 [json_name="annotation"];
-  int32 simple = 3 [json_name="simple"];
-  string Comment = 4 [json_name="comment"];
+  Node value = 3 [json_name="value"];
+  int32 simple = 4 [json_name="simple"];
+  string Comment = 5 [json_name="comment"];
 }
 
 message Arg
