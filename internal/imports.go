@@ -132,7 +132,7 @@ func (i *importer) queryImportSpecs(fileName string) (map[string]importSpec, map
 
 	pkg := make(map[string]importSpec)
 	pkg["sqlalchemy"] = importSpec{Module: "sqlalchemy"}
-	if i.C.EmitAsyncQuerier {
+	if i.C.EmitAsync || i.C.EmitAsyncQuerier {
 		pkg["sqlalchemy.ext.asyncio"] = importSpec{Module: "sqlalchemy.ext.asyncio"}
 	}
 
@@ -154,11 +154,16 @@ func (i *importer) queryImportSpecs(fileName string) (map[string]importSpec, map
 			std["typing.Optional"] = importSpec{Module: "typing", Name: "Optional"}
 		}
 		if q.Cmd == ":many" {
-			if i.C.EmitSyncQuerier {
-				std["typing.Iterator"] = importSpec{Module: "typing", Name: "Iterator"}
-			}
-			if i.C.EmitAsyncQuerier {
-				std["typing.AsyncIterator"] = importSpec{Module: "typing", Name: "AsyncIterator"}
+			// NOTE: We are adding backwards compatible behavior
+			if i.C.EmitGenerators || i.C.EmitSyncQuerier || i.C.EmitAsyncQuerier {
+				if i.C.EmitAsync || i.C.EmitAsyncQuerier {
+					std["typing.AsyncIterator"] = importSpec{Module: "typing", Name: "AsyncIterator"}
+				}
+				if !i.C.EmitAsync || i.C.EmitSyncQuerier {
+					std["typing.Iterator"] = importSpec{Module: "typing", Name: "Iterator"}
+				}
+			} else {
+				std["typing.List"] = importSpec{Module: "typing", Name: "List"}
 			}
 		}
 		queryValueModelImports(q.Ret)

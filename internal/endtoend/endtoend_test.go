@@ -100,8 +100,9 @@ func TestGenerate(t *testing.T) {
 			cmd := exec.Command(sqlc, "diff")
 			cmd.Dir = dir
 			got, err := cmd.CombinedOutput()
+			// TODO: We are diffing patches! Does this make sense and what should we provide to the end user?
 			if diff := cmp.Diff(string(want), string(got)); diff != "" {
-				t.Errorf("sqlc diff mismatch (-want +got):\n%s", diff)
+				t.Errorf("sqlc diff mismatch (-want +got):\n%s", string(got))
 			}
 			if len(want) == 0 && err != nil {
 				t.Error(err)

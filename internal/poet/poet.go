@@ -161,6 +161,13 @@ func Node(node proto) *ast.Node {
 	// case *ast.Node_Subscript:
 	// 	w.printSubscript(n.Subscript, indent)
 
+	case *ast.Return:
+		return &ast.Node{
+			Node: &ast.Node_Return{
+				Return: n,
+			},
+		}
+
 	case *ast.Yield:
 		return &ast.Node{
 			Node: &ast.Node_Yield{

@@ -22,7 +22,7 @@ func postgresType(req *plugin.GenerateRequest, col *plugin.Column) string {
 	case "json", "jsonb":
 		return "Any"
 	case "bytea", "blob", "pg_catalog.bytea":
-		return "memoryview"
+		return "bytes"
 	case "date":
 		return "datetime.date"
 	case "pg_catalog.time", "pg_catalog.timetz":
