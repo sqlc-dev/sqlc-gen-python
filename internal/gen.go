@@ -193,6 +193,8 @@ func pyInnerType(req *plugin.GenerateRequest, col *plugin.Column) string {
 	switch req.Settings.Engine {
 	case "postgresql":
 		return postgresType(req, col)
+	case "sqlite":
+		return sqliteType(req, col)
 	default:
 		log.Println("unsupported engine type")
 		return "Any"
