@@ -1,21 +1,39 @@
 ## Usage
 
 ```yaml
-version: '2'
+version: "2"
 plugins:
-- name: py
-  wasm:
-    url: https://downloads.sqlc.dev/plugin/sqlc-gen-python_1.2.0.wasm
-    sha256: a6c5d174c407007c3717eea36ff0882744346e6ba991f92f71d6ab2895204c0e
+  - name: py
+    wasm:
+      url: https://downloads.sqlc.dev/plugin/sqlc-gen-python_1.2.0.wasm
+      sha256: a6c5d174c407007c3717eea36ff0882744346e6ba991f92f71d6ab2895204c0e
 sql:
-- schema: "schema.sql"
-  queries: "query.sql"
-  engine: postgresql
-  codegen:
-  - out: src/authors
-    plugin: py
-    options:
-      package: authors
-      emit_sync_querier: true
-      emit_async_querier: true
+  - schema: "schema.sql"
+    queries: "query.sql"
+    engine: postgresql
+    codegen:
+      - out: src/authors
+        plugin: py
+        options:
+          package: authors
+          emit_sync_querier: true
+          emit_async_querier: true
 ```
+
+### Emit Pydantic Models instead of `dataclasses`
+
+Option: `emit_pydantic_models`
+
+By default, `sqlc-gen-python` will emit `dataclasses` for the models. If you prefer to use [`pydantic`](https://docs.pydantic.dev/latest/) models, you can enable this option.
+
+### Use `enum.StrEnum` for Enums
+
+Option: `emit_str_enum`
+
+`enum.StrEnum` was introduce in Python 3.11.
+
+`enum.StrEnum` is a subclass of `str` that is also a subclass of `Enum`. This allows for the use of `Enum` values as strings, compared to strings, or compared to other `enum.StrEnum` types.
+
+This is convenient for type checking and validation, as well as for serialization and deserialization.
+
+By default, `sqlc-gen-python` will emit `(str, enum.Enum)` for the enum classes. If you prefer to use `enum.StrEnum`, you can enable this option.
