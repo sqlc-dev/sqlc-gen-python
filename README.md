@@ -39,9 +39,9 @@ class Author(pydantic.BaseModel):
 without `emit_pydantic_models`
 
 ```py
-from dataclasses import dataclasses
+import dataclasses
 
-@dataclasses
+@dataclasses.dataclass()
 class Author:
     id: int
     name: str
