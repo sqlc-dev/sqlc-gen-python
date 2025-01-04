@@ -26,6 +26,27 @@ Option: `emit_pydantic_models`
 
 By default, `sqlc-gen-python` will emit `dataclasses` for the models. If you prefer to use [`pydantic`](https://docs.pydantic.dev/latest/) models, you can enable this option.
 
+with `emit_pydantic_models`
+
+```py
+from pydantic import BaseModel
+
+class Author(pydantic.BaseModel):
+    id: int
+    name: str
+```
+
+without `emit_pydantic_models`
+
+```py
+from dataclasses import dataclasses
+
+@dataclasses
+class Author:
+    id: int
+    name: str
+```
+
 ### Use `enum.StrEnum` for Enums
 
 Option: `emit_str_enum`
@@ -37,3 +58,21 @@ Option: `emit_str_enum`
 This is convenient for type checking and validation, as well as for serialization and deserialization.
 
 By default, `sqlc-gen-python` will emit `(str, enum.Enum)` for the enum classes. If you prefer to use `enum.StrEnum`, you can enable this option.
+
+with `emit_str_enum`
+
+```py
+class Status(enum.StrEnum):
+    """Venues can be either open or closed"""
+    OPEN = "op!en"
+    CLOSED = "clo@sed"
+```
+
+without `emit_str_enum` (current behavior)
+
+```py
+class Status(str, enum.Enum):
+    """Venues can be either open or closed"""
+    OPEN = "op!en"
+    CLOSED = "clo@sed"
+```
