@@ -12,11 +12,10 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
       with:
-        go-version: '1.21'
-    # - run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@main
+        go-version: '1.23.5'
     - uses: sqlc-dev/setup-sqlc@v4
       with:
-        sqlc-version: '1.27.0'
+        sqlc-version: '1.28.0'
     - run: make
     - run: make test
     - run: sqlc diff
