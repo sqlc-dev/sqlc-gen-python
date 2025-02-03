@@ -9,5 +9,6 @@
     pkgs.gopls
     pkgs.golint
     pkgs.python311
+    pkgs.sqlc
   ];
 }
