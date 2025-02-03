@@ -101,7 +101,7 @@ func TestGenerate(t *testing.T) {
 			cmd.Dir = dir
 			got, err := cmd.CombinedOutput()
 			if diff := cmp.Diff(string(want), string(got)); diff != "" {
-				t.Errorf("sqlc diff mismatch (-want +got):\n%s", diff)
+				t.Errorf("sqlc diff mismatch:\n%s", string(got))
 			}
 			if len(want) == 0 && err != nil {
 				t.Error(err)

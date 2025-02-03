@@ -7,11 +7,12 @@ plugins:
 sql:
 - schema: schema.sql
   queries: query.sql
-  engine: postgresql
+  engine: mysql
   codegen:
   - plugin: py
-    out: python
+    out: db
     options:
-      package: querytest
+      package: db
       emit_sync_querier: true
       emit_async_querier: true
+      emit_pydantic_models: true
