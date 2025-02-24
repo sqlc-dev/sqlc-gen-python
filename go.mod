@@ -3,7 +3,7 @@ module github.com/sqlc-dev/sqlc-gen-python
 go 1.19
 
 require (
-	github.com/google/go-cmp v0.6.0
+	github.com/google/go-cmp v0.7.0
 	github.com/jinzhu/inflection v1.0.0
 	github.com/sqlc-dev/plugin-sdk-go v1.23.0
 	google.golang.org/protobuf v1.34.2
